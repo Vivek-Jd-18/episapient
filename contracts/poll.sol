@@ -67,7 +67,9 @@ contract Vote {
     // This mapping stores the details of all the wardens.
     mapping(address => WardenInfo) wardenDetails;
 
-    function fetchWarden()
+    function fetchWarden(
+        address _wardenAddress
+    )
         public
         view
         returns (
@@ -76,17 +78,17 @@ contract Vote {
             bool _haveActivePoll
         )
     {
-        _pollId = wardenDetails[msg.sender].pollId;
-        _currentPoll = wardenDetails[msg.sender].currentPoll;
-        _haveActivePoll = wardenDetails[msg.sender].haveActivePoll;
+        _pollId = wardenDetails[_wardenAddress].pollId;
+        _currentPoll = wardenDetails[_wardenAddress].currentPoll;
+        _haveActivePoll = wardenDetails[_wardenAddress].haveActivePoll;
     }
 
     // This function creates a new poll with the given parameters
     function createPoll(
-        address[] memory members,
-        uint256 timeLimit,
-        uint256 voteOptions,
-        string memory _pollName
+        address[] memory members, // An array of member addresses who are allowed to vote in the poll
+        uint256 endTime, // The timestamp when the poll ends and no more votes can be cast
+        uint256 voteOptions, // The number of voting options available in the poll
+        string memory _pollName // The name of the poll
     ) public {
         // Check if the sender already has an active poll
         bool doesWardenHaveActivePoll = wardenDetails[msg.sender]
@@ -97,7 +99,7 @@ contract Vote {
             uint256 _poll = wardenDetails[msg.sender].currentPoll;
             require(
                 pollDetails[_poll].endTime < block.timestamp,
-                "Time is yet to pass, can't make one more poll"
+                "you already have one Poll Active, can't make one more!"
             );
             // Set the haveActivePoll flag to false
             wardenDetails[msg.sender].haveActivePoll = false;
@@ -108,6 +110,8 @@ contract Vote {
             !wardenDetails[msg.sender].haveActivePoll,
             "You only can create a single Poll at a time"
         );
+
+        require(endTime > block.timestamp, "please select a valid endtime");
 
         // Increment the poll count and create a new poll ID
         uint256 newPollId = pollCount + 1;
@@ -123,7 +127,7 @@ contract Vote {
             true,
             members.length + 1,
             block.timestamp,
-            timeLimit,
+            endTime,
             0,
             voteOptions,
             PollVoteOptions(newPollId, defaultVotes)
@@ -150,21 +154,29 @@ contract Vote {
         wardenDetails[msg.sender].haveActivePoll = true;
     }
 
-    // This function returns the poll details for a given poll ID
-    function getPollDetails(uint8 pollId)
-        public
-        view
-        returns (PollInfo memory pollInfo)
-    {
+    // This function updates the status of a poll based on its end time.
+    function updatePoll(
+        uint8 pollId
+    ) public returns (PollInfo memory pollInfo) {
+        // If the end time of the poll is less than the current block timestamp,
+        // the poll is considered expired and its status is set to false.
+        if (pollDetails[pollId].endTime < block.timestamp) {
+            pollDetails[pollId].pollStatus = false;
+        }
+
+        // Get a reference to the PollInfo struct of the given poll ID.
         PollInfo storage _pollInfo = pollDetails[pollId];
+
+        // Return the PollInfo struct by value.
+        // The value returned is the same as _pollInfo, but stored in memory instead of storage.
         pollInfo = _pollInfo;
     }
 
     // This function allows a user to cast their vote for a given poll ID and vote option
-    function makeVote(uint8 pollId, uint256 _vote)
-        public
-        eligibleToVote(pollId)
-    {
+    function makeVote(
+        uint8 pollId,
+        uint256 _vote
+    ) public eligibleToVote(pollId) {
         // Get the voter and poll details from storage
         VoterInfo storage voter = voterDetails[msg.sender][pollId];
         PollInfo storage poll = pollDetails[pollId];
@@ -204,11 +216,10 @@ contract Vote {
     }
 
     // This function adds voters to a poll
-    function addVoters(uint256 pollId, address[] memory members)
-        public
-        onlyPollCreator(pollId)
-        returns (uint256 _memberCount)
-    {
+    function addVoters(
+        uint256 pollId,
+        address[] memory members
+    ) public onlyPollCreator(pollId) returns (uint256 _memberCount) {
         // Increase the poll's member count by the number of members being added
         pollDetails[pollId].pollMemberCount += members.length;
         // Loop through each member being added
@@ -231,7 +242,9 @@ contract Vote {
     }
 
     // This function returns the poll results and poll name for a given poll ID
-    function pollResult(uint8 pollId)
+    function pollResult(
+        uint8 pollId
+    )
         public
         view
         returns (PollVoteOptions memory result, string memory _pollName)
