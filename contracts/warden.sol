@@ -1,3 +1,5 @@
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
@@ -18,10 +20,10 @@ interface IERC20 {
 
     function transfer(address to, uint256 amount) external returns (bool);
 
-    function allowance(address owner, address spender)
-        external
-        view
-        returns (uint256);
+    function allowance(
+        address owner,
+        address spender
+    ) external view returns (uint256);
 
     function approve(address spender, uint256 amount) external returns (bool);
 
@@ -58,10 +60,10 @@ contract Community {
     }
 
     // Remove the last element.
-    function _removeAddress(address[] storage arr, address item)
-        internal
-        returns (bool)
-    {
+    function _removeAddress(
+        address[] storage arr,
+        address item
+    ) internal returns (bool) {
         for (uint256 i = 0; i < arr.length; i++) {
             if (arr[i] == item) {
                 for (uint256 j = i; j < arr.length - 1; j++) {
@@ -80,7 +82,40 @@ contract Community {
     }
 }
 
+contract Episapient {
+    address public owner;
+
+    mapping(address => bool) public whitelist;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    //This function call by only owner
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    //onlyOwner can add a whitelisted address
+    function addWhitelistuser(address user) public onlyOwner {
+        whitelist[user] = true;
+    }
+
+    //onlyOwner can remove a whitelisted address
+    function removeWhitelistuser(address user) public onlyOwner {
+        whitelist[user] = false;
+    }
+
+    //check user whitelisted or not
+    function checkWhitelistuser(address user) public view returns (bool) {
+        return whitelist[user];
+    }
+}
+
 contract Warden is Community {
+    using SafeMath for uint256;
+
     IERC20 public token;
     address payable owner;
     uint256 public wardenCount;
@@ -115,10 +150,9 @@ contract Warden is Community {
     //wardens per community memebers
     mapping(uint256 => uint256) public wardensPerCommunity;
 
-    function stakeTokens(uint256 amount)
-        internal
-        returns (uint256 amountStaked)
-    {
+    function stakeTokens(
+        uint256 amount
+    ) internal returns (uint256 amountStaked) {
         require(amount >= minimumStakeAmount, "stake amount is not sufficient");
         require(
             amount <= token.allowance(msg.sender, address(this)),
@@ -141,9 +175,9 @@ contract Warden is Community {
     }
 
     // setWardensPerThousandMember(int) : this will define number of wardens a community can have per 1K members
-    function changeWardensPerCommunityRate(uint256 _wardensPerCommunityRate)
-        public
-    {
+    function changeWardensPerCommunityRate(
+        uint256 _wardensPerCommunityRate
+    ) public {
         wardensPerCommunityRate = _wardensPerCommunityRate;
     }
 
@@ -155,10 +189,10 @@ contract Warden is Community {
     }
 
     // becomeWarden(stackAmount, categoryId) - Check if user is whitelisted, Check if currentWardenCount < memberCapacity
-    function becomeWarden(uint256 communityId, uint256 amount)
-        public
-        returns (uint256 _wardenCount)
-    {
+    function becomeWarden(
+        uint256 communityId,
+        uint256 amount
+    ) public returns (uint256 _wardenCount) {
         //updates warden
         // updateWardens(communityId);
 
@@ -192,10 +226,10 @@ contract Warden is Community {
     }
 
     // Remove the last element.
-    function removeItem(uint256[] storage arr, uint256 item)
-        internal
-        returns (bool)
-    {
+    function removeItem(
+        uint256[] storage arr,
+        uint256 item
+    ) internal returns (bool) {
         for (uint256 i = 0; i < arr.length; i++) {
             if (arr[i] == item) {
                 for (uint256 j = i; j < arr.length - 1; j++) {
@@ -209,10 +243,10 @@ contract Warden is Community {
     }
 
     // Remove the last element.
-    function removeAddress(address[] storage arr, address item)
-        internal
-        returns (bool)
-    {
+    function removeAddress(
+        address[] storage arr,
+        address item
+    ) internal returns (bool) {
         for (uint256 i = 0; i < arr.length; i++) {
             if (arr[i] == item) {
                 for (uint256 j = i; j < arr.length - 1; j++) {
@@ -226,10 +260,10 @@ contract Warden is Community {
     }
 
     // removeWarden(walletAddress, categoryId) - Remove warden of particular category - Only Owner / Contract Only
-    function removeWarden(uint256 communityId, address wardenAddress)
-        public
-        returns (uint256 _wardenCount)
-    {
+    function removeWarden(
+        uint256 communityId,
+        address wardenAddress
+    ) public returns (uint256 _wardenCount) {
         //updates warden
         // updateWardens(communityId);
 
@@ -298,29 +332,34 @@ contract Warden is Community {
     }
 
     // setMiniumStakeAmount - Only Owner
-    function setMiniumStakeAmount(uint256 newMinimumStakeAmount)
-        public
-        onlyOwner
-    {
+    function setMiniumStakeAmount(
+        uint256 newMinimumStakeAmount
+    ) public onlyOwner {
         minimumStakeAmount = newMinimumStakeAmount;
     }
 
     // updateWardens :  for all categories check if currentWardenCount > memberCapacity, then remove the last warden
-    function updateWardens(uint256 communityId) public returns (bool isValid) {
-        
-        uint256 totalMembers = (communityDetails[communityId].membersCount);
-        uint256 wardenRate = (wardensPerCommunityRate); 
+
+    function updateWardens(
+        uint256 communityId
+    ) public returns (bool isValid, uint256 _a, uint256 _b, uint256 _c) {
+        uint256 totalMembers = communityDetails[communityId].membersCount;
         uint256 totalWardens = communityDetails[communityId].wardensCount;
-        
+        uint256 wardenRate = wardensPerCommunityRate;
+        _a = totalMembers;
+        _b = totalWardens;
+        _c = wardenRate;
+
         if (totalWardens > 0) {
-        uint256 Res = wardenRate*totalWardens;
-            if (Res <= totalMembers) {
-                uint256 noOfmembers = communityDetails[communityId]
-                    .communityMembers
+            // uint256 newWardenRate = totalMembers.div(totalWardens);
+            uint256 newWardenRate = totalMembers / totalWardens;
+            if (wardenRate > newWardenRate) {
+                uint256 noOfWardens = communityDetails[communityId]
+                    .communityWardens
                     .length;
-                address lastMember = communityDetails[communityId]
-                    .communityMembers[noOfmembers - 1];
-                removeWarden(communityId, lastMember);
+                address lastWarden = communityDetails[communityId]
+                    .communityWardens[noOfWardens - 1];
+                removeWarden(communityId, lastWarden);
                 isValid = true;
             } else {
                 isValid = false;
@@ -328,14 +367,12 @@ contract Warden is Community {
         } else {
             isValid = false;
         }
-        return isValid;
+        isValid;
     }
 
-    function displayAll(uint256 id)
-        public
-        view
-        returns (address[] memory _data1, address[] memory _data2)
-    {
+    function displayAll(
+        uint256 id
+    ) public view returns (address[] memory _data1, address[] memory _data2) {
         _data1 = communityDetails[id].communityWardens;
         _data2 = communityDetails[id].communityMembers;
     }
